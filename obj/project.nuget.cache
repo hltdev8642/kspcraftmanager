@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "yLvXOL7jodk=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\jared\\Documents\\_KSP\\_dev\\kspcraftmgr\\KSPCraftManager.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\jared\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.3\\microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
+    "C:\\Users\\jared\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net48\\1.0.3\\microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

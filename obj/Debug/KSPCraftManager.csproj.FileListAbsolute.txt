@@ -1,0 +1,6 @@
+C:\Users\jared\Documents\_KSP\_dev\kspcraftmgr\obj\Debug\KSPCraftManager.csproj.AssemblyReference.cache
+C:\Users\jared\Documents\_KSP\_dev\kspcraftmgr\obj\Debug\KSPCraftManager.csproj.CoreCompileInputs.cache
+C:\Users\jared\Documents\_KSP\_dev\kspcraftmgr\bin\Debug\KSPCraftManager.dll
+C:\Users\jared\Documents\_KSP\_dev\kspcraftmgr\bin\Debug\KSPCraftManager.pdb
+C:\Users\jared\Documents\_KSP\_dev\kspcraftmgr\obj\Debug\KSPCraftManager.dll
+C:\Users\jared\Documents\_KSP\_dev\kspcraftmgr\obj\Debug\KSPCraftManager.pdb
