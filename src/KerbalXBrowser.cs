@@ -106,15 +106,19 @@ namespace KSPCraftManager
         /// </summary>
         public void Refresh()
         {
+            if (IsLoading) return; // prevent duplicate requests
+
             if (!KerbalXAPI.Instance.IsAuthenticated)
             {
-                ErrorMessage = "Not authenticated. Set your KerbalX API key in Settings.";
+                ErrorMessage = "Not authenticated. Set your KerbalX API key in Settings (use the [S] button).";
                 OnCraftsUpdated?.Invoke();
                 return;
             }
 
             IsLoading = true;
             ErrorMessage = null;
+
+            Debug.Log($"[KSPCraftManager] KerbalXBrowser Refresh: page={CurrentPage}, search='{SearchQuery}', myCrafts={ShowMyCrafts}");
 
             if (ShowMyCrafts)
             {
@@ -217,6 +221,7 @@ namespace KSPCraftManager
             if (!result.Success)
             {
                 ErrorMessage = result.ErrorMessage;
+                Debug.LogWarning($"[KSPCraftManager] KerbalX API request '{requestType}' failed: {result.ErrorMessage}");
                 OnCraftsUpdated?.Invoke();
                 return;
             }
@@ -224,8 +229,8 @@ namespace KSPCraftManager
             CurrentPage = result.CurrentPage;
             TotalPages = result.TotalPages > 0 ? result.TotalPages : 1;
 
-            // Convert to CrafInfo-equivalent listings
             RemoteCrafts = result.Crafts;
+            Debug.Log($"[KSPCraftManager] KerbalX API '{requestType}' returned {result.Crafts.Count} crafts (page {CurrentPage}/{TotalPages})");
             OnCraftsUpdated?.Invoke();
         }
 

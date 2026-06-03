@@ -193,14 +193,19 @@ namespace KSPCraftManager
         /// <summary>
         /// Generates a procedural thumbnail based on craft metadata.
         /// Creates a visual representation showing part count, mass, and type.
+        /// Includes craft name text and a unique hue from the craft's name hash
+        /// so no two crafts look identical.
         /// </summary>
         private Texture2D GenerateFallbackThumbnail(CraftInfo craft, int size)
         {
             Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
 
-            // Background gradient
-            Color bgTop = craft.Type == "VAB" ? new Color(0.1f, 0.1f, 0.15f) : new Color(0.12f, 0.15f, 0.18f);
-            Color bgBottom = craft.Type == "VAB" ? new Color(0.05f, 0.05f, 0.08f) : new Color(0.06f, 0.08f, 0.1f);
+            // Derive a unique hue from the craft name for visual distinction
+            float nameHue = GetNameHue(craft);
+
+            // Background gradient with unique hue
+            Color bgTop = Color.HSVToRGB(nameHue, 0.25f, 0.18f);
+            Color bgBottom = Color.HSVToRGB((nameHue + 0.5f) % 1f, 0.35f, 0.08f);
 
             for (int y = 0; y < size; y++)
             {
@@ -218,8 +223,8 @@ namespace KSPCraftManager
             int bodyWidth = Mathf.Clamp(craft.PartCount / 2, 8, size / 3);
             int bodyHeight = Mathf.Clamp(craft.PartCount, 20, size - 20);
 
-            // Rocket body (cylinder with nose cone)
-            Color bodyColor = GetTypeColor(craft);
+            // Body color — use craft name hue shifted for contrast
+            Color bodyColor = Color.HSVToRGB((nameHue + 0.33f) % 1f, 0.7f, 0.75f);
 
             for (int y = centerY - bodyHeight / 2; y <= centerY + bodyHeight / 2; y++)
             {
@@ -264,7 +269,7 @@ namespace KSPCraftManager
             // Draw wings if SPH
             if (craft.Type == "SPH")
             {
-                Color wingColor = new Color(0.4f, 0.4f, 0.45f);
+                Color wingColor = Color.HSVToRGB((nameHue + 0.66f) % 1f, 0.5f, 0.5f);
                 for (int y = centerY; y <= centerY + bodyHeight / 3; y++)
                 {
                     if (y < 0 || y >= size) continue;
@@ -281,7 +286,7 @@ namespace KSPCraftManager
                 }
             }
 
-            // Draw part count text representation
+            // Draw craft name text along the bottom
             DrawSimpleStats(tex, craft, size);
 
             tex.Apply();
@@ -289,29 +294,60 @@ namespace KSPCraftManager
         }
 
         /// <summary>
-        /// Draws simple stat indicators on the thumbnail.
+        /// Returns a stable hue (0..1) derived from the craft's name for visual distinction.
+        /// </summary>
+        private float GetNameHue(CraftInfo craft)
+        {
+            int hash = craft.Name.GetHashCode();
+            // Ensure positive and map to 0..1
+            uint u = (uint)hash;
+            return (u % 360) / 360f;
+        }
+
+        /// <summary>
+        /// Draws simple stat indicators and craft name on the thumbnail.
         /// </summary>
         private void DrawSimpleStats(Texture2D tex, CraftInfo craft, int size)
         {
-            // Draw a small part-count indicator in the corner
-            int labelY = size - 12;
-            string partLabel = $"P:{craft.PartCount}";
+            // Draw craft name at the bottom
+            string nameLabel = craft.Name.Length > 10 ? craft.Name.Substring(0, 10) + ".." : craft.Name;
+            int labelY = size - 8;
             Color labelColor = Color.white;
 
-            for (int i = 0; i < partLabel.Length; i++)
+            for (int i = 0; i < nameLabel.Length; i++)
             {
                 int x = 4 + i * 7;
-                if (x < size)
+                if (x < size - 8)
                 {
-                    // Simple pixel letter drawing
-                    for (int dy = -3; dy <= 3; dy++)
+                    for (int dy = -2; dy <= 2; dy++)
                     {
-                        for (int dx = -2; dx <= 2; dx++)
+                        for (int dx = -1; dx <= 1; dx++)
                         {
                             int px = x + dx;
                             int py = labelY + dy;
                             if (px >= 0 && px < size && py >= 0 && py < size)
                                 tex.SetPixel(px, py, labelColor);
+                        }
+                    }
+                }
+            }
+
+            // Draw part-count indicator in top-right
+            string partLabel = $"P:{craft.PartCount}";
+            int px2 = size - 8 - partLabel.Length * 7;
+            for (int i = 0; i < partLabel.Length; i++)
+            {
+                int x = px2 + i * 7;
+                if (x >= 0 && x < size)
+                {
+                    for (int dy = -2; dy <= 2; dy++)
+                    {
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int pxx = x + dx;
+                            int py = 6 + dy;
+                            if (pxx >= 0 && pxx < size && py >= 0 && py < size)
+                                tex.SetPixel(pxx, py, new Color(0.8f, 0.8f, 0.3f));
                         }
                     }
                 }

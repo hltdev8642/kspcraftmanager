@@ -107,6 +107,7 @@
     <Compile Include="src\KerbalXBrowser.cs" />
     <Compile Include="src\CraftDetailsPanel.cs" />
     <Compile Include="src\CraftComparer.cs" />
+    <Compile Include="src\AssemblyInfo.cs" />
     <Compile Include="src\IManager.cs" />
     <Compile Include="src\MiniJSON.cs" />
     <Compile Include="src\VersionHistory.cs" />

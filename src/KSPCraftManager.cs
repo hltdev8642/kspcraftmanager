@@ -63,6 +63,61 @@ namespace KSPCraftManager
         }
 
         /// <summary>
+        /// Called by HotReloadKSP when this MonoBehaviour is hot-reloaded.
+        /// The old component's non-reloading-assembly fields are auto-copied.
+        /// We manually restore singleton, re-init subsystems, and clean up old state.
+        /// </summary>
+        /// <param name="old">The old KSPCraftManager component being replaced.</param>
+        private void OnHotReload(MonoBehaviour old)
+        {
+            KSPCraftManager oldManager = old as KSPCraftManager;
+            if (oldManager == null) return;
+
+            Debug.Log("[KSPCraftManager] Hot-reload detected. Re-initializing subsystems.");
+
+            // Clean up old component's subsystems before it gets destroyed
+            oldManager.Shutdown();
+
+            // Re-assign singleton to this new instance
+            Instance = this;
+
+            // Re-resolve paths (assembly location is from new assembly)
+            string assemblyLocation = Assembly.GetExecutingAssembly().Location;
+            PluginDataPath = Path.GetDirectoryName(assemblyLocation);
+            ModPath = Path.GetFullPath(Path.Combine(PluginDataPath, ".."));
+
+            // Restore window visibility from old state
+            IsWindowVisible = oldManager.IsWindowVisible;
+
+            // Re-initialize all subsystems (creates fresh IManager instances)
+            InitializeSubsystems();
+
+            // Show/hide window based on restored state
+            if (IsWindowVisible)
+            {
+                CraftManagerGUI.Instance.Show();
+            }
+
+            Debug.Log("[KSPCraftManager] Hot-reload complete.");
+        }
+
+        /// <summary>
+        /// Called by HotReloadKSP when the assembly is first loaded (not a reload).
+        /// </summary>
+        public static void OnHotLoad()
+        {
+            Debug.Log("[KSPCraftManager] Assembly hot-loaded.");
+        }
+
+        /// <summary>
+        /// Called by HotReloadKSP when the old assembly is being replaced.
+        /// </summary>
+        public static void OnHotUnload()
+        {
+            Debug.Log("[KSPCraftManager] Assembly hot-unloaded.");
+        }
+
+        /// <summary>
         /// Creates and initializes all mod subsystems in dependency order.
         /// </summary>
         private void InitializeSubsystems()
@@ -78,15 +133,16 @@ namespace KSPCraftManager
                 toolbar.OnToolbarToggle += OnToolbarToggled;
                 _managers.Add(toolbar);
 
-                // Data managers
-                CraftDataManager dataManager = CraftDataManager.Instance;
-                _managers.Add(dataManager);
-
+                // Data managers — Favorites and Tags must come before CraftDataManager
+                // since CraftDataManager.RefreshCraftList() reads them in ApplyFavoritesAndTags()
                 FavoritesManager favorites = FavoritesManager.Instance;
                 _managers.Add(favorites);
 
                 TagManager tagManager = TagManager.Instance;
                 _managers.Add(tagManager);
+
+                CraftDataManager dataManager = CraftDataManager.Instance;
+                _managers.Add(dataManager);
 
                 VersionHistory versionHistory = VersionHistory.Instance;
                 _managers.Add(versionHistory);

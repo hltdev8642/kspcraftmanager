@@ -65,6 +65,7 @@ namespace KSPCraftManager
         public static KerbalXAPI Instance => _instance ?? (_instance = new KerbalXAPI());
 
         private const string ApiBaseUrl = "https://kerbalx.com/api/";
+        private const string ApiDocsUrl = "https://kerbalx.com/api/docs";
         private const int RequestTimeoutSeconds = 30;
 
         private string _apiKey;
@@ -280,10 +281,12 @@ namespace KSPCraftManager
             UnityWebRequest req = UnityWebRequest.Get(url);
             req.timeout = RequestTimeoutSeconds;
             req.SetRequestHeader("Accept", "application/json");
+            req.SetRequestHeader("User-Agent", "KSPCraftManager/1.0");
 
             if (!string.IsNullOrEmpty(_apiKey))
                 req.SetRequestHeader("Authorization", $"Bearer {_apiKey}");
 
+            Debug.Log($"[KSPCraftManager] KerbalX request: GET {url}");
             return req;
         }
 
@@ -298,7 +301,24 @@ namespace KSPCraftManager
             {
                 result.Success = false;
                 result.ErrorMessage = req.error;
-                Debug.LogWarning($"[KSPCraftManager] KerbalX API error: {req.error}");
+
+                // Try to read response body for more details (usually JSON error)
+                string body = req.downloadHandler?.text;
+                if (!string.IsNullOrEmpty(body))
+                {
+                    try
+                    {
+                        var errJson = Json.Deserialize(body) as Dictionary<string, object>;
+                        if (errJson != null && errJson.TryGetValue("error", out object errMsg))
+                            result.ErrorMessage = errMsg.ToString();
+                    }
+                    catch { }
+                    Debug.LogWarning($"[KSPCraftManager] KerbalX API error: {req.error} | Body: {body}");
+                }
+                else
+                {
+                    Debug.LogWarning($"[KSPCraftManager] KerbalX API error: {req.error}");
+                }
                 return result;
             }
 
@@ -309,7 +329,8 @@ namespace KSPCraftManager
                 if (json == null)
                 {
                     result.Success = false;
-                    result.ErrorMessage = "Invalid JSON response";
+                    result.ErrorMessage = "Invalid JSON response from KerbalX";
+                    Debug.LogWarning($"[KSPCraftManager] KerbalX invalid JSON: {jsonText?.Substring(0, Mathf.Min(200, jsonText?.Length ?? 0))}");
                     return result;
                 }
 

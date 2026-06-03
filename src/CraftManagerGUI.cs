@@ -34,7 +34,10 @@ namespace KSPCraftManager
         private float _minParts, _maxParts, _minMass, _maxMass;
 
         private const int WindowId = 782341;
+        private const int FolderWindowId = 782342;
         private const float DefaultWidth = 900f;
+        private const float MinWindowWidth = 480f;
+        private const float MinWindowHeight = 300f;
         private const float DefaultHeight = 650f;
         private const float TabHeight = 28f;
         private const float ToolbarHeight = 40f;
@@ -64,6 +67,7 @@ namespace KSPCraftManager
         private bool _showFolderManager;
         private string _selectedFolder;
         private string _folderType = "VAB";
+        private Rect _folderWindowRect = new Rect(200, 150, 480, 380);
 
         // ── Dependency Check Results ─────────────────────────────────────
         private ModDependencyResult _depResult;
@@ -137,6 +141,16 @@ namespace KSPCraftManager
             _windowRect.y = Mathf.Clamp(_windowRect.y, 0, Screen.height - 100);
 
             _windowRect = GUI.Window(WindowId, _windowRect, DrawWindowContent, "", GetWindowStyle());
+            _windowRect.width = Mathf.Max(MinWindowWidth, _windowRect.width);
+            _windowRect.height = Mathf.Max(MinWindowHeight, _windowRect.height);
+
+            // Folder manager as a separate window
+            if (_showFolderManager)
+            {
+                _folderWindowRect = GUI.Window(FolderWindowId, _folderWindowRect, DrawFolderManagerWindow, "Folder Manager", GetWindowStyle());
+                _folderWindowRect.x = Mathf.Clamp(_folderWindowRect.x, 0, Screen.width - 100);
+                _folderWindowRect.y = Mathf.Clamp(_folderWindowRect.y, 0, Screen.height - 100);
+            }
         }
 
         /// <summary>
@@ -173,9 +187,7 @@ namespace KSPCraftManager
             if (_showDialog)
                 DrawDialog();
 
-            // Folder manager overlay
-            if (_showFolderManager)
-                DrawFolderManager();
+            // Folder manager is now a separate window (handled in DrawGUI)
 
             // Auth dialog overlay
             if (_showAuthDialog)
@@ -205,15 +217,15 @@ namespace KSPCraftManager
             GUILayout.FlexibleSpace();
 
             // Folders button
-            if (GUILayout.Button("📁", GUILayout.Width(28), GUILayout.Height(22)))
+            if (GUILayout.Button("[F]", GUILayout.Width(28), GUILayout.Height(22)))
                 _showFolderManager = !_showFolderManager;
 
             // Settings button
-            if (GUILayout.Button("⚙", GUILayout.Width(28), GUILayout.Height(22)))
+            if (GUILayout.Button("[S]", GUILayout.Width(28), GUILayout.Height(22)))
                 SettingsWindow.Instance.Toggle();
 
             // Close button
-            if (GUILayout.Button("✕", GUILayout.Width(28), GUILayout.Height(22)))
+            if (GUILayout.Button("[X]", GUILayout.Width(28), GUILayout.Height(22)))
                 Toggle();
 
             GUILayout.EndHorizontal();
@@ -256,7 +268,7 @@ namespace KSPCraftManager
 
             // Search box
             _searchText = GUILayout.TextField(_searchText, 50, GUILayout.Width(180), GUILayout.Height(22));
-            if (GUILayout.Button("🔍", GUILayout.Width(24), GUILayout.Height(22)))
+            if (GUILayout.Button(">", GUILayout.Width(24), GUILayout.Height(22)))
                 _needsRefresh = true;
 
             // Type filter
@@ -270,35 +282,38 @@ namespace KSPCraftManager
 
             GUILayout.Space(10);
 
-            // Sort controls
-            GUILayout.Label("Sort:", GUILayout.Width(35));
-            string[] sortOptions = { "Name", "Parts", "Mass", "Cost", "Date", "Downloads" };
-            int sortIdx = Array.IndexOf(sortOptions,
-                _sortField == "name" ? "Name" :
-                _sortField == "partcount" ? "Parts" :
-                _sortField == "mass" ? "Mass" :
-                _sortField == "cost" ? "Cost" :
-                _sortField == "date" ? "Date" : "Downloads");
-            if (sortIdx < 0) sortIdx = 0;
-
-            int newSortIdx = GUILayout.Toolbar(sortIdx, sortOptions, GUILayout.Height(22), GUILayout.Width(360));
-            if (newSortIdx != sortIdx)
+            // Sort controls (responsive: collapse for narrow windows)
+            if (_windowRect.width >= 700)
             {
-                _sortField = sortOptions[newSortIdx].ToLowerInvariant();
-                _needsRefresh = true;
-            }
+                GUILayout.Label("Sort:", GUILayout.Width(35));
+                string[] sortOptions = { "Name", "Parts", "Mass", "Cost", "Date", "Downloads" };
+                int sortIdx = Array.IndexOf(sortOptions,
+                    _sortField == "name" ? "Name" :
+                    _sortField == "partcount" ? "Parts" :
+                    _sortField == "mass" ? "Mass" :
+                    _sortField == "cost" ? "Cost" :
+                    _sortField == "date" ? "Date" : "Downloads");
+                if (sortIdx < 0) sortIdx = 0;
 
-            // Sort direction
-            if (GUILayout.Button(_sortDirection == "asc" ? "↑" : "↓", GUILayout.Width(24), GUILayout.Height(22)))
-            {
-                _sortDirection = _sortDirection == "asc" ? "desc" : "asc";
-                _needsRefresh = true;
+                int newSortIdx = GUILayout.Toolbar(sortIdx, sortOptions, GUILayout.Height(22), GUILayout.Width(360));
+                if (newSortIdx != sortIdx)
+                {
+                    _sortField = sortOptions[newSortIdx].ToLowerInvariant();
+                    _needsRefresh = true;
+                }
+
+                // Sort direction
+                if (GUILayout.Button(_sortDirection == "asc" ? "^" : "v", GUILayout.Width(24), GUILayout.Height(22)))
+                {
+                    _sortDirection = _sortDirection == "asc" ? "desc" : "asc";
+                    _needsRefresh = true;
+                }
             }
 
             GUILayout.FlexibleSpace();
 
             // Grid/List toggle
-            if (GUILayout.Button(_useGridView ? "▦ Grid" : "☰ List", GUILayout.Width(60), GUILayout.Height(22)))
+            if (GUILayout.Button(_useGridView ? "[#] Grid" : "[=] List", GUILayout.Width(60), GUILayout.Height(22)))
             {
                 _useGridView = !_useGridView;
                 SettingsManager.Instance.UseGridView = _useGridView;
@@ -318,23 +333,48 @@ namespace KSPCraftManager
                 _lastRefreshTime = Time.realtimeSinceStartup;
             }
 
-            float availableHeight = _windowRect.height - 80 - TabHeight - ToolbarHeight - StatusBarHeight;
-            Rect listRect = new Rect(4, 74, _windowRect.width - 8, availableHeight);
-
-            GUILayout.BeginArea(listRect);
-
             if (_displayedCrafts.Count == 0)
             {
                 GUILayout.FlexibleSpace();
-                GUILayout.Label("No crafts found. Try adjusting your search or filters.",
-                    new GUIStyle { normal = { textColor = Color.gray }, fontSize = 13, alignment = TextAnchor.MiddleCenter },
-                    GUILayout.ExpandWidth(true));
+
+                if (_activeTab == 1) // KerbalX tab
+                {
+                    if (KerbalXBrowser.Instance.IsLoading)
+                    {
+                        GUILayout.Label("Loading KerbalX crafts...",
+                            new GUIStyle { normal = { textColor = new Color(1f, 0.8f, 0.2f) }, fontSize = 13, alignment = TextAnchor.MiddleCenter },
+                            GUILayout.ExpandWidth(true));
+                    }
+                    else if (!string.IsNullOrEmpty(KerbalXBrowser.Instance.ErrorMessage))
+                    {
+                        GUILayout.Label($"KerbalX Error: {KerbalXBrowser.Instance.ErrorMessage}",
+                            new GUIStyle { normal = { textColor = new Color(1f, 0.4f, 0.4f) }, fontSize = 12, alignment = TextAnchor.MiddleCenter },
+                            GUILayout.ExpandWidth(true));
+                        GUILayout.Space(8);
+                        if (GUILayout.Button("Retry", GUILayout.Width(80), GUILayout.Height(24)))
+                        {
+                            KerbalXBrowser.Instance.Refresh();
+                        }
+                    }
+                    else
+                    {
+                        GUILayout.Label("No KerbalX crafts found. Try searching above.",
+                            new GUIStyle { normal = { textColor = Color.gray }, fontSize = 13, alignment = TextAnchor.MiddleCenter },
+                            GUILayout.ExpandWidth(true));
+                    }
+                }
+                else
+                {
+                    GUILayout.Label("No crafts found. Try adjusting your search or filters.",
+                        new GUIStyle { normal = { textColor = Color.gray }, fontSize = 13, alignment = TextAnchor.MiddleCenter },
+                        GUILayout.ExpandWidth(true));
+                }
+
                 GUILayout.FlexibleSpace();
-                GUILayout.EndArea();
                 return;
             }
 
-            _scrollPosition = GUILayout.BeginScrollView(_scrollPosition);
+            _scrollPosition = GUILayout.BeginScrollView(_scrollPosition, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
             if (_useGridView)
                 DrawGridView();
@@ -342,7 +382,6 @@ namespace KSPCraftManager
                 DrawListView();
 
             GUILayout.EndScrollView();
-            GUILayout.EndArea();
         }
 
         /// <summary>
@@ -381,8 +420,7 @@ namespace KSPCraftManager
             // Favorite star
             if (craft.IsFavorite)
             {
-                GUI.Label(new Rect(itemRect.x + 2, itemRect.y + 2, 16, 16), "★",
-                    new GUIStyle { normal = { textColor = new Color(1f, 0.8f, 0.1f) }, fontSize = 14 });
+                GUI.Label(new Rect(itemRect.x + 2, itemRect.y + 2, 16, 16), "*", new GUIStyle { normal = { textColor = new Color(1f, 0.8f, 0.1f) }, fontSize = 14 });
             }
 
             // Thumbnail
@@ -430,17 +468,23 @@ namespace KSPCraftManager
         /// </summary>
         private void DrawListView()
         {
+            // Responsive column widths
+            float listW = _windowRect.width - 40;
+            float nameW = Mathf.Min(180, listW * 0.25f);
+            float modW = Mathf.Min(80, listW * 0.15f);
+            float dateW = Mathf.Min(120, listW * 0.2f);
+
             // Header
             GUILayout.BeginHorizontal();
-            GUILayout.Label("", GUILayout.Width(24)); // Star column
-            GUILayout.Label("Name", GUILayout.Width(180));
-            GUILayout.Label("Type", GUILayout.Width(50));
-            GUILayout.Label("Parts", GUILayout.Width(50));
-            GUILayout.Label("Mass", GUILayout.Width(60));
-            GUILayout.Label("Cost", GUILayout.Width(80));
-            GUILayout.Label("Mods", GUILayout.Width(80));
-            GUILayout.Label("Modified", GUILayout.Width(120));
-            GUILayout.Label("Source", GUILayout.Width(60));
+            GUILayout.Label("", GUILayout.Width(20)); // Star column
+            GUILayout.Label("Name", GUILayout.Width(nameW));
+            GUILayout.Label("Type", GUILayout.Width(40));
+            GUILayout.Label("Parts", GUILayout.Width(40));
+            GUILayout.Label("Mass", GUILayout.Width(50));
+            GUILayout.Label("Cost", GUILayout.Width(60));
+            GUILayout.Label("Mods", GUILayout.Width(modW));
+            GUILayout.Label("Modified", GUILayout.Width(dateW));
+            GUILayout.Label("Source", GUILayout.Width(40));
             GUILayout.EndHorizontal();
 
             // Separator
@@ -459,6 +503,12 @@ namespace KSPCraftManager
         /// </summary>
         private void DrawListRow(CraftInfo craft, int index)
         {
+            // Use responsive widths from the calling DrawListView context
+            float lw = _windowRect.width - 40;
+            float nameW = Mathf.Min(180, lw * 0.25f);
+            float modW = Mathf.Min(80, lw * 0.15f);
+            float dateW = Mathf.Min(120, lw * 0.2f);
+
             bool isSelected = index == _selectedIndex;
             Color rowBg = isSelected ? new Color(0.2f, 0.35f, 0.55f, 0.4f) :
                 (index % 2 == 0 ? new Color(0.08f, 0.08f, 0.1f, 0.2f) : Color.clear);
@@ -468,9 +518,9 @@ namespace KSPCraftManager
                 : GUIStyle.none);
 
             // Favorite star
-            GUILayout.Label(craft.IsFavorite ? "★" : "☆",
+            GUILayout.Label(craft.IsFavorite ? "*" : " ",
                 new GUIStyle { normal = { textColor = craft.IsFavorite ? new Color(1f, 0.8f, 0.1f) : Color.gray },
-                    fontSize = 14 }, GUILayout.Width(24));
+                    fontSize = 14 }, GUILayout.Width(20));
 
             // Thumbnail small
             Texture2D thumb = CraftCache.Instance.GetThumbnail(craft);
@@ -479,35 +529,35 @@ namespace KSPCraftManager
                 GUI.DrawTexture(thumbRect, thumb);
 
             // Name
-            if (GUILayout.Button(craft.Name, GetListLinkStyle(), GUILayout.Width(180)))
+            if (GUILayout.Button(craft.Name, GetListLinkStyle(), GUILayout.Width(nameW)))
             {
                 _selectedIndex = index;
                 CraftDetailsPanel.Instance.SelectCraft(craft);
             }
 
             // Type
-            GUILayout.Label(craft.Type, GUILayout.Width(50));
+            GUILayout.Label(craft.Type, GUILayout.Width(40));
 
             // Parts
-            GUILayout.Label(craft.PartCount.ToString("N0"), GUILayout.Width(50));
+            GUILayout.Label(craft.PartCount.ToString("N0"), GUILayout.Width(40));
 
             // Mass
-            GUILayout.Label(craft.TotalMass.ToString("F1") + "t", GUILayout.Width(60));
+            GUILayout.Label(craft.TotalMass.ToString("F1") + "t", GUILayout.Width(50));
 
             // Cost
-            GUILayout.Label("₧" + craft.TotalCost.ToString("N0"), GUILayout.Width(80));
+            GUILayout.Label(craft.TotalCost.ToString("N0"), GUILayout.Width(60));
 
             // Mods
             string mods = craft.RequiredMods.Count > 0
-                ? (craft.RequiredMods.Count + (ModDependencyChecker.Instance.IsModInstalled(craft.RequiredMods[0]) ? "" : " ⚠"))
+                ? (craft.RequiredMods.Count + (ModDependencyChecker.Instance.IsModInstalled(craft.RequiredMods[0]) ? "" : " [!]"))
                 : "stock";
-            GUILayout.Label(mods, GUILayout.Width(80));
+            GUILayout.Label(mods, GUILayout.Width(modW));
 
             // Modified
-            GUILayout.Label(craft.LastModified.ToString("yyyy-MM-dd HH:mm"), GUILayout.Width(120));
+            GUILayout.Label(craft.LastModified.ToString("yyyy-MM-dd HH:mm"), GUILayout.Width(dateW));
 
             // Source
-            GUILayout.Label(craft.Source == CraftSource.KerbalX ? "🌐" : "💻", GUILayout.Width(60));
+            GUILayout.Label(craft.Source == CraftSource.KerbalX ? "Web" : "Loc", GUILayout.Width(40));
 
             GUILayout.EndHorizontal();
 
@@ -559,7 +609,7 @@ namespace KSPCraftManager
                 if (GUILayout.Button("Export", GUILayout.Width(60), GUILayout.Height(20)))
                     ExportCraft(selected);
 
-                if (GUILayout.Button(selected.IsFavorite ? "★" : "☆", GUILayout.Width(28), GUILayout.Height(20)))
+                if (GUILayout.Button(selected.IsFavorite ? "*" : " ", GUILayout.Width(28), GUILayout.Height(20)))
                     ToggleFavorite(selected);
 
                 // KerbalX tab: Download button
@@ -570,7 +620,7 @@ namespace KSPCraftManager
                     if (listing != null)
                     {
                         bool isDl = KerbalXBrowser.Instance.IsDownloading(listing);
-                        if (GUILayout.Button(isDl ? "..." : "⬇ Download", GUILayout.Width(80), GUILayout.Height(20)))
+                        if (GUILayout.Button(isDl ? "..." : "DL", GUILayout.Width(80), GUILayout.Height(20)))
                         {
                             if (!isDl)
                                 KerbalXBrowser.Instance.DownloadCraft(listing);
@@ -600,22 +650,22 @@ namespace KSPCraftManager
                 fontSize = 12, fontStyle = FontStyle.Bold, padding = new RectOffset(6, 2, 4, 2) });
             GUILayout.Space(4);
 
-            DrawContextItem("▶ Load", () => { LoadCraft(_contextCraft); _showContextMenu = false; });
-            DrawContextItem("📋 Duplicate", () => { PromptDuplicateCraft(_contextCraft); _showContextMenu = false; });
-            DrawContextItem("📊 Compare", () => { PromptCompareCraft(_contextCraft); _showContextMenu = false; });
-            DrawContextItem("💾 Export", () => { ExportCraft(_contextCraft); _showContextMenu = false; });
-            DrawContextItem(_contextCraft.IsFavorite ? "★ Unfavorite" : "☆ Favorite",
+            DrawContextItem("> Load", () => { LoadCraft(_contextCraft); _showContextMenu = false; });
+            DrawContextItem("Duplicate", () => { PromptDuplicateCraft(_contextCraft); _showContextMenu = false; });
+            DrawContextItem("Compare", () => { PromptCompareCraft(_contextCraft); _showContextMenu = false; });
+            DrawContextItem("Export", () => { ExportCraft(_contextCraft); _showContextMenu = false; });
+            DrawContextItem(_contextCraft.IsFavorite ? "* Unfavorite" : "  Favorite",
                 () => { ToggleFavorite(_contextCraft); _showContextMenu = false; });
-            DrawContextItem("🏷 Manage Tags", () => { PromptManageTags(_contextCraft); _showContextMenu = false; });
+            DrawContextItem("Manage Tags", () => { PromptManageTags(_contextCraft); _showContextMenu = false; });
 
             GUILayout.Space(4);
-            DrawContextItem("🔍 Check Mods", () => { CheckMods(_contextCraft); _showContextMenu = false; });
-            DrawContextItem("📁 Move to Folder", () => { _showContextMenu = false; _showFolderManager = true; });
+            DrawContextItem("Check Mods", () => { CheckMods(_contextCraft); _showContextMenu = false; });
+            DrawContextItem("Move to Folder", () => { _showContextMenu = false; _showFolderManager = true; });
 
             if (_contextCraft.Source == CraftSource.Local)
             {
                 GUILayout.Space(4);
-                DrawContextItem("🗑 Delete", () => { PromptDeleteCraft(_contextCraft); _showContextMenu = false; });
+                DrawContextItem("Delete", () => { PromptDeleteCraft(_contextCraft); _showContextMenu = false; });
             }
 
             GUILayout.EndArea();
@@ -941,23 +991,12 @@ namespace KSPCraftManager
             GUILayout.EndArea();
         }
 
-        // ── Folder Manager ──────────────────────────────────────────────
+        // ── Folder Manager (separate window) ────────────────────────────
 
-        private void DrawFolderManager()
+        private void DrawFolderManagerWindow(int windowId)
         {
-            GUI.Box(new Rect(0, 0, Screen.width, Screen.height), "",
-                new GUIStyle { normal = { background = MakeTexture(1, 1, new Color(0, 0, 0, 0.5f)) } });
-
-            float fw = 450, fh = 350;
-            Rect fmRect = new Rect((Screen.width - fw) / 2, (Screen.height - fh) / 2, fw, fh);
-            GUI.Box(fmRect, "", new GUIStyle { normal = { background = MakeTexture(1, 1, new Color(0.2f, 0.2f, 0.25f)) },
-                border = new RectOffset(4, 4, 4, 4) });
-
-            GUILayout.BeginArea(new Rect(fmRect.x + 10, fmRect.y + 10, fw - 20, fh - 20));
-
-            GUILayout.Label("Folder Manager", new GUIStyle { normal = { textColor = new Color(1f, 0.8f, 0.2f) },
-                fontSize = 15, fontStyle = FontStyle.Bold });
-            GUILayout.Space(8);
+            GUILayout.BeginVertical();
+            GUILayout.Space(6);
 
             // Type selector
             GUILayout.BeginHorizontal();
@@ -975,17 +1014,16 @@ namespace KSPCraftManager
                 GUILayout.Label("  (none)", new GUIStyle { normal = { textColor = Color.gray }, fontSize = 11 });
             else
             {
-                foreach (string folder in folders)
+                for (int i = 0; i < folders.Count; i++)
                 {
                     GUILayout.BeginHorizontal();
-                    GUILayout.Label($"  📁 {folder}", GUILayout.Width(250));
+                    GUILayout.Label($"  [>] {folders[i]}", GUILayout.MinWidth(120), GUILayout.ExpandWidth(true));
                     if (GUILayout.Button("Rename", GUILayout.Width(60), GUILayout.Height(20)))
                     {
-                        _currentDialogType = DialogType.RenameFolder;
-                        string oldName = folder;
+                        string oldName = folders[i];
                         _dialogTitle = "Rename Folder";
-                        _dialogMessage = $"Rename \"{folder}\":";
-                        _dialogInput = folder;
+                        _dialogMessage = $"Rename \"{folders[i]}\":";
+                        _dialogInput = folders[i];
                         _dialogCallback = (confirmed, input) =>
                         {
                             if (confirmed && !string.IsNullOrEmpty(input))
@@ -997,13 +1035,12 @@ namespace KSPCraftManager
                         };
                         _showDialog = true;
                     }
-                    if (GUILayout.Button("Delete", GUILayout.Width(60), GUILayout.Height(20)))
+                    if (GUILayout.Button("Del", GUILayout.Width(30), GUILayout.Height(20)))
                     {
-                        _currentDialogType = DialogType.DeleteConfirm;
+                        string delFolder = folders[i];
                         _dialogTitle = "Delete Folder";
-                        _dialogMessage = $"Delete \"{folder}\" and all crafts inside?";
+                        _dialogMessage = $"Delete \"{folders[i]}\" and all crafts inside?";
                         _dialogInput = "";
-                        string delFolder = folder;
                         _dialogCallback = (confirmed, _) =>
                         {
                             if (confirmed)
@@ -1024,7 +1061,6 @@ namespace KSPCraftManager
             // Create new folder
             if (GUILayout.Button("+ Create New Folder", GUILayout.Height(24)))
             {
-                _currentDialogType = DialogType.CreateFolder;
                 _dialogTitle = "Create Folder";
                 _dialogMessage = $"Enter name for new folder in Ships/{_folderType}/:";
                 _dialogInput = "";
@@ -1042,10 +1078,14 @@ namespace KSPCraftManager
 
             GUILayout.FlexibleSpace();
 
-            if (GUILayout.Button("Close", GUILayout.Height(26)))
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Close", GUILayout.Width(80), GUILayout.Height(26)))
                 _showFolderManager = false;
+            GUILayout.EndHorizontal();
 
-            GUILayout.EndArea();
+            GUILayout.EndVertical();
+            GUI.DragWindow(new Rect(0, 0, _folderWindowRect.width, 24));
         }
 
         // ── Auth Dialog ──────────────────────────────────────────────────
